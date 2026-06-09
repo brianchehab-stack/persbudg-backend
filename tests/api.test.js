@@ -323,3 +323,78 @@ test('pagination query validation rejects invalid values', async () => {
   assert.equal(response.status, 400);
   assert.match(response.body.message, /Page|Limit/i);
 });
+
+test('forgot-password and reset-password flow updates credentials', async () => {
+  await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Reset User',
+      email: 'reset@example.com',
+      password: 'Password123!'
+    })
+  });
+
+  const forgotResponse = await request('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'reset@example.com'
+    })
+  });
+
+  assert.equal(forgotResponse.status, 200);
+  assert.ok(forgotResponse.body.resetToken);
+
+  const resetResponse = await request('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token: forgotResponse.body.resetToken,
+      password: 'NewPassword123!'
+    })
+  });
+
+  assert.equal(resetResponse.status, 200);
+  assert.match(resetResponse.body.message, /reset/i);
+
+  const oldLoginResponse = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'reset@example.com',
+      password: 'Password123!'
+    })
+  });
+
+  assert.equal(oldLoginResponse.status, 401);
+
+  const newLoginResponse = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'reset@example.com',
+      password: 'NewPassword123!'
+    })
+  });
+
+  assert.equal(newLoginResponse.status, 200);
+  assert.ok(newLoginResponse.body.accessToken);
+});
+
+test('reset-password rejects invalid token', async () => {
+  await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Reset User 2',
+      email: 'reset2@example.com',
+      password: 'Password123!'
+    })
+  });
+
+  const response = await request('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token: 'not-a-valid-token',
+      password: 'NewPassword123!'
+    })
+  });
+
+  assert.equal(response.status, 400);
+  assert.match(response.body.message, /invalid|expired/i);
+});

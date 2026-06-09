@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
 import User from '../models/User.js';
@@ -137,4 +138,65 @@ const logoutUser = async (req, res) => {
 	return res.json({ message: 'Logged out successfully' });
 };
 
-export { registerUser, loginUser, getCurrentUser, refreshAuth, logoutUser };
+const forgotPassword = async (req, res) => {
+	const { email } = req.body;
+	const user = await User.findOne({ email: email.toLowerCase() });
+
+	if (!user) {
+		return res.json({
+			message:
+				'If an account with that email exists, a password reset link has been generated.'
+		});
+	}
+
+	const resetToken = crypto.randomBytes(32).toString('hex');
+	const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+	const resetExpiry = new Date(Date.now() + 15 * 60 * 1000);
+
+	user.passwordResetTokenHash = resetTokenHash;
+	user.passwordResetExpiresAt = resetExpiry;
+	await user.save();
+
+	const responsePayload = {
+		message: 'If an account with that email exists, a password reset link has been generated.'
+	};
+
+	if (process.env.NODE_ENV !== 'production') {
+		responsePayload.resetToken = resetToken;
+		responsePayload.expiresAt = resetExpiry.toISOString();
+	}
+
+	return res.json(responsePayload);
+};
+
+const resetPassword = async (req, res) => {
+	const { token, password } = req.body;
+	const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+	const user = await User.findOne({
+		passwordResetTokenHash: resetTokenHash,
+		passwordResetExpiresAt: { $gt: new Date() }
+	});
+
+	if (!user) {
+		return res.status(400).json({ message: 'Invalid or expired password reset token' });
+	}
+
+	user.password = await bcrypt.hash(password, 10);
+	user.passwordResetTokenHash = null;
+	user.passwordResetExpiresAt = null;
+	user.refreshTokenHash = null;
+	await user.save();
+
+	return res.json({ message: 'Password reset successful' });
+};
+
+export {
+	registerUser,
+	loginUser,
+	getCurrentUser,
+	refreshAuth,
+	logoutUser,
+	forgotPassword,
+	resetPassword
+};

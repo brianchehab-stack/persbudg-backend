@@ -167,12 +167,34 @@ const validateRefreshTokenPayload = (req, res, next) => {
   return next();
 };
 
+const validateForgotPasswordPayload = (req, res, next) => {
+  if (!isValidEmail(req.body.email)) {
+    return sendValidationError(res, 'A valid email is required');
+  }
+
+  return next();
+};
+
+const validateResetPasswordPayload = (req, res, next) => {
+  if (!isNonEmptyString(req.body.token)) {
+    return sendValidationError(res, 'Reset token is required');
+  }
+
+  if (typeof req.body.password !== 'string' || req.body.password.length < 8) {
+    return sendValidationError(res, 'Password must be at least 8 characters long');
+  }
+
+  return next();
+};
+
 export {
   validateBudgetPayload,
+  validateForgotPasswordPayload,
   validatePaginationQuery,
   validateLogin,
   validateRegistration,
   validateRefreshTokenPayload,
+  validateResetPasswordPayload,
   validateTransactionListQuery,
   validateTransactionPayload
 };
