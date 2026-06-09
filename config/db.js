@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 
+const isLocalMongoUri = (uri) =>
+  typeof uri === 'string' &&
+  (uri.includes('127.0.0.1') || uri.includes('localhost'));
+
 const connectDB = async () => {
   const mongoUri = process.env.MONGO_URI;
   const hasValidScheme =
@@ -13,12 +17,25 @@ const connectDB = async () => {
     return false;
   }
 
+  if (process.env.NODE_ENV === 'production' && isLocalMongoUri(mongoUri)) {
+    console.warn(
+      'MONGO_URI points to localhost in production. For Render, set MONGO_URI to MongoDB Atlas or another external MongoDB host.'
+    );
+  }
+
   try {
     await mongoose.connect(mongoUri);
     console.log('MongoDB Connected');
     return true;
   } catch (error) {
     console.error(`MongoDB connection failed: ${error.message}`);
+
+    if (isLocalMongoUri(mongoUri)) {
+      console.error(
+        'Detected local MongoDB URI. In Render, 127.0.0.1/localhost is not your local machine. Set MONGO_URI to your Atlas connection string.'
+      );
+    }
+
     return false;
   }
 };
