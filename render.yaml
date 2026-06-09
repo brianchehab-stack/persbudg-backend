@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: persbudg-backend
+    name: persbudg-backend-1
     env: node
     plan: free
     buildCommand: npm install
