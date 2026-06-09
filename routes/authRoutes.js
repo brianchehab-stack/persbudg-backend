@@ -1,17 +1,26 @@
-const express = require("express");
+import express from 'express';
+
+import {
+	getCurrentUser,
+	loginUser,
+	logoutUser,
+	refreshAuth,
+	registerUser
+} from '../controllers/authController.js';
+import protect from '../middleware/authMiddleware.js';
+import {
+	validateLogin,
+	validateRefreshTokenPayload,
+	validateRegistration
+} from '../middleware/validateRequest.js';
 
 const router = express.Router();
 
-router.post("/register", (req, res) => {
-  res.json({
-    message: "Register User"
-  });
-});
+router.post('/register', validateRegistration, registerUser);
+router.post('/login', validateLogin, loginUser);
+router.post('/refresh', validateRefreshTokenPayload, refreshAuth);
+router.post('/logout', protect, logoutUser);
+router.get('/me', protect, getCurrentUser);
 
-router.post("/login", (req, res) => {
-  res.json({
-    message: "Login User"
-  });
-});
+export default router;
 
-module.exports = router;

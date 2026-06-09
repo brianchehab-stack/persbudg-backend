@@ -1,25 +1,26 @@
-
-import authRoutes      from './routes/'authRoutes.js';
-import budgetRoutes from './routes/budgetRoutes.js';
-import transactionRoutes from './routes/transactionRoutes.js';
-import connectDB from './config/db.js'; 
-
-const mongoose = require("mongoose");
+import mongoose from 'mongoose';
 
 const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+  const mongoUri = process.env.MONGO_URI;
+  const hasValidScheme =
+    typeof mongoUri === 'string' &&
+    (mongoUri.startsWith('mongodb://') || mongoUri.startsWith('mongodb+srv://'));
 
-    console.log("MongoDB Connected");
+  if (!hasValidScheme) {
+    console.warn(
+      'Skipping MongoDB connection: set MONGO_URI to a valid mongodb:// or mongodb+srv:// URI.'
+    );
+    return false;
+  }
+
+  try {
+    await mongoose.connect(mongoUri);
+    console.log('MongoDB Connected');
+    return true;
   } catch (error) {
-    console.error(error.message);
-    process.exit(1);
+    console.error(`MongoDB connection failed: ${error.message}`);
+    return false;
   }
 };
-app.use('/api/auth', authRoutes);
-app.use('/api/budgets', budgetRoutes);
-app.use('/api/transactions', transactionRoutes);
-module.exports = connectDB;
+
+export default connectDB;

@@ -1,0 +1,121 @@
+@baseUrl = http://localhost:5000
+@accessToken = paste_access_token_here
+@refreshToken = paste_refresh_token_here
+@budgetId = paste_budget_id_here
+@transactionId = paste_transaction_id_here
+
+### Health
+GET {{baseUrl}}/
+
+### Register
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Demo User",
+  "email": "demo@persbudg.local",
+  "password": "Password123!"
+}
+
+### Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@persbudg.local",
+  "password": "Password123!"
+}
+
+### Refresh Token
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### List Budgets With Pagination
+GET {{baseUrl}}/api/budgets?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+### List Transactions With Filters
+GET {{baseUrl}}/api/transactions?page=1&limit=10&type=expense&category=Food
+Authorization: Bearer {{accessToken}}
+
+### Current User
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### List Budgets
+GET {{baseUrl}}/api/budgets
+Authorization: Bearer {{accessToken}}
+
+### Budget Summary
+GET {{baseUrl}}/api/budgets/summary
+Authorization: Bearer {{accessToken}}
+
+### Create Budget
+POST {{baseUrl}}/api/budgets
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Entertainment",
+  "category": "Lifestyle",
+  "amount": 200,
+  "period": "monthly",
+  "notes": "Streaming and going out"
+}
+
+### Update Budget
+PUT {{baseUrl}}/api/budgets/{{budgetId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "amount": 250,
+  "notes": "Updated monthly cap"
+}
+
+### Delete Budget
+DELETE {{baseUrl}}/api/budgets/{{budgetId}}
+Authorization: Bearer {{accessToken}}
+
+### List Transactions
+GET {{baseUrl}}/api/transactions
+Authorization: Bearer {{accessToken}}
+
+### Transaction Summary
+GET {{baseUrl}}/api/transactions/summary
+Authorization: Bearer {{accessToken}}
+
+### Create Transaction
+POST {{baseUrl}}/api/transactions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "budget": "{{budgetId}}",
+  "type": "expense",
+  "category": "Dining",
+  "amount": 34.95,
+  "description": "Lunch meeting"
+}
+
+### Update Transaction
+PUT {{baseUrl}}/api/transactions/{{transactionId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "amount": 40,
+  "description": "Updated lunch total"
+}
+
+### Delete Transaction
+DELETE {{baseUrl}}/api/transactions/{{transactionId}}
+Authorization: Bearer {{accessToken}}
