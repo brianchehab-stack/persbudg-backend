@@ -5,7 +5,18 @@ import app from './app.js';
 import connectDB from './config/db.js';
 
 dotenv.config();
-connectDB();
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+const startServer = async () => {
+	const connected = await connectDB();
+
+	if (!connected) {
+		console.error('Server startup aborted: MongoDB connection is required.');
+		process.exit(1);
+	}
+
+	app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+};
+
+startServer();

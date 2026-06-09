@@ -5,7 +5,7 @@ const isLocalMongoUri = (uri) =>
   (uri.includes('127.0.0.1') || uri.includes('localhost'));
 
 const connectDB = async () => {
-  const mongoUri = process.env.MONGO_URI;
+  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
   const hasValidScheme =
     typeof mongoUri === 'string' &&
     (mongoUri.startsWith('mongodb://') || mongoUri.startsWith('mongodb+srv://'));
@@ -24,7 +24,12 @@ const connectDB = async () => {
   }
 
   try {
-    await mongoose.connect(mongoUri);
+    mongoose.set('bufferCommands', false);
+
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 30000,
+    });
+
     console.log('MongoDB Connected');
     return true;
   } catch (error) {
