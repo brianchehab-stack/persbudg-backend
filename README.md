@@ -100,6 +100,20 @@ Continuous integration runs `npm test` on push and pull requests.
 
 If local MongoDB is not running, the tests will fail to connect.
 
+## Deploy on Render
+
+1. Create a new Web Service on Render from this repository.
+2. Use these settings:
+   - Runtime: Node
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+3. Add these environment variables in Render:
+   - `MONGO_URI=<your MongoDB connection string>`
+   - `JWT_SECRET=<a long random secret>`
+   - `FRONTEND_URLS=<your frontend URL>`
+   - `PORT=10000` is not required; Render injects `PORT` automatically.
+4. If you deploy from `render.yaml`, Render will use the same settings automatically.
+
 ## Connect Frontend to Backend
 
 1. Set backend environment variables in `.env`:
