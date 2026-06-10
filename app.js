@@ -1,6 +1,7 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import mongoose from 'mongoose';
 
 import authRoutes from './routes/authRoutes.js';
 import budgetRoutes from './routes/budgetRoutes.js';
@@ -38,6 +39,36 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({ message: 'Personal Budget is running' });
+});
+
+app.get('/health', (req, res) => {
+  const mongoState = mongoose.connection.readyState;
+  const mongoConnected = mongoState === 1;
+
+  res.status(mongoConnected ? 200 : 503).json({
+    status: mongoConnected ? 'ok' : 'degraded',
+    service: 'persbudg-backend',
+    database: {
+      connected: mongoConnected,
+      state: mongoState,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  const mongoState = mongoose.connection.readyState;
+  const mongoConnected = mongoState === 1;
+
+  res.status(mongoConnected ? 200 : 503).json({
+    status: mongoConnected ? 'ok' : 'degraded',
+    service: 'persbudg-backend',
+    database: {
+      connected: mongoConnected,
+      state: mongoState,
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use('/api/auth', authRoutes);
