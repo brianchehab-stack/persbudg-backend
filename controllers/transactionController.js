@@ -5,6 +5,18 @@ import Transaction from '../models/Transaction.js';
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+const migrateLegacyTransactionFields = async (userId) => {
+	await Transaction.collection.updateMany(
+		{ user: { $exists: false }, userId },
+		{ $set: { user: userId } }
+	);
+
+	await Transaction.collection.updateMany(
+		{ user: userId, budget: { $exists: false }, budgetId: { $type: 'objectId' } },
+		[{ $set: { budget: '$budgetId' } }]
+	);
+};
+
 const buildPagination = (query) => {
 	const page = Math.max(parseInt(query.page || '1', 10), 1);
 	const limit = Math.min(Math.max(parseInt(query.limit || '10', 10), 1), 100);
@@ -44,6 +56,8 @@ const buildTransactionFilters = (userId, query) => {
 };
 
 const listTransactions = async (req, res) => {
+	await migrateLegacyTransactionFields(req.user._id);
+
 	const { page, limit, skip } = buildPagination(req.query);
 	const filters = buildTransactionFilters(req.user._id, req.query);
 	const [transactions, total] = await Promise.all([
@@ -67,6 +81,8 @@ const listTransactions = async (req, res) => {
 };
 
 const getTransactionSummary = async (req, res) => {
+	await migrateLegacyTransactionFields(req.user._id);
+
 	const summary = await Transaction.aggregate([
 		{
 			$match: {
@@ -103,6 +119,8 @@ const getTransactionById = async (req, res) => {
 		return res.status(400).json({ message: 'Invalid transaction id' });
 	}
 
+	await migrateLegacyTransactionFields(req.user._id);
+
 	const transaction = await Transaction.findOne({ _id: id, user: req.user._id }).populate(
 		'budget',
 		'name category amount'
@@ -116,7 +134,10 @@ const getTransactionById = async (req, res) => {
 };
 
 const createTransaction = async (req, res) => {
-	const { budget, type, category, amount, description, date } = req.body;
+	await migrateLegacyTransactionFields(req.user._id);
+
+	const { type, category, amount, description, date } = req.body;
+	const budget = req.body.budget ?? req.body.budgetId;
 
 	if (!type || !category || amount === undefined) {
 		return res.status(400).json({ message: 'Type, category, and amount are required' });
@@ -164,21 +185,25 @@ const updateTransaction = async (req, res) => {
 		return res.status(400).json({ message: 'Invalid transaction id' });
 	}
 
+	await migrateLegacyTransactionFields(req.user._id);
+
 	const transaction = await Transaction.findOne({ _id: id, user: req.user._id });
 
 	if (!transaction) {
 		return res.status(404).json({ message: 'Transaction not found' });
 	}
 
-	if (req.body.budget !== undefined) {
-		if (req.body.budget === null || req.body.budget === '') {
+	const nextBudget = req.body.budget ?? req.body.budgetId;
+
+	if (nextBudget !== undefined) {
+		if (nextBudget === null || nextBudget === '') {
 			transaction.budget = undefined;
 		} else {
-			if (!isValidId(req.body.budget)) {
+			if (!isValidId(nextBudget)) {
 				return res.status(400).json({ message: 'Invalid budget id' });
 			}
 
-			const existingBudget = await Budget.findOne({ _id: req.body.budget, user: req.user._id });
+			const existingBudget = await Budget.findOne({ _id: nextBudget, user: req.user._id });
 
 			if (!existingBudget) {
 				return res.status(404).json({ message: 'Budget not found' });
@@ -217,6 +242,8 @@ const deleteTransaction = async (req, res) => {
 	if (!isValidId(id)) {
 		return res.status(400).json({ message: 'Invalid transaction id' });
 	}
+
+	await migrateLegacyTransactionFields(req.user._id);
 
 	const transaction = await Transaction.findOne({ _id: id, user: req.user._id });
 

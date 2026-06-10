@@ -5,6 +5,13 @@ import Transaction from '../models/Transaction.js';
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+const migrateLegacyBudgetOwnership = async (userId) => {
+	await Budget.collection.updateMany(
+		{ user: { $exists: false }, userId },
+		{ $set: { user: userId } }
+	);
+};
+
 const buildPagination = (query) => {
 	const page = Math.max(parseInt(query.page || '1', 10), 1);
 	const limit = Math.min(Math.max(parseInt(query.limit || '10', 10), 1), 100);
@@ -14,6 +21,8 @@ const buildPagination = (query) => {
 };
 
 const listBudgets = async (req, res) => {
+	await migrateLegacyBudgetOwnership(req.user._id);
+
 	const { page, limit, skip } = buildPagination(req.query);
 	const filter = { user: req.user._id };
 	const [budgets, total] = await Promise.all([
@@ -33,6 +42,8 @@ const listBudgets = async (req, res) => {
 };
 
 const getBudgetSummary = async (req, res) => {
+	await migrateLegacyBudgetOwnership(req.user._id);
+
 	const budgets = await Budget.find({ user: req.user._id }).lean();
 	const expenses = await Transaction.aggregate([
 		{
@@ -72,6 +83,8 @@ const getBudgetById = async (req, res) => {
 		return res.status(400).json({ message: 'Invalid budget id' });
 	}
 
+	await migrateLegacyBudgetOwnership(req.user._id);
+
 	const budget = await Budget.findOne({ _id: id, user: req.user._id });
 
 	if (!budget) {
@@ -82,6 +95,8 @@ const getBudgetById = async (req, res) => {
 };
 
 const createBudget = async (req, res) => {
+	await migrateLegacyBudgetOwnership(req.user._id);
+
 	const { name, category, amount, period, startDate, endDate, notes } = req.body;
 
 	if (!name || amount === undefined) {
@@ -114,6 +129,8 @@ const updateBudget = async (req, res) => {
 	if (!isValidId(id)) {
 		return res.status(400).json({ message: 'Invalid budget id' });
 	}
+
+	await migrateLegacyBudgetOwnership(req.user._id);
 
 	const budget = await Budget.findOne({ _id: id, user: req.user._id });
 
@@ -149,6 +166,8 @@ const deleteBudget = async (req, res) => {
 	if (!isValidId(id)) {
 		return res.status(400).json({ message: 'Invalid budget id' });
 	}
+
+	await migrateLegacyBudgetOwnership(req.user._id);
 
 	const budget = await Budget.findOne({ _id: id, user: req.user._id });
 

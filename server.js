@@ -20,4 +20,3 @@ const startServer = async () => {
 };
 
 startServer();
-connectDB();
