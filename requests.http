@@ -38,6 +38,23 @@ Content-Type: application/json
 POST {{baseUrl}}/api/auth/logout
 Authorization: Bearer {{accessToken}}
 
+### Forgot Password
+POST {{baseUrl}}/api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "demo@persbudg.local"
+}
+
+### Reset Password
+POST {{baseUrl}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "{{resetToken}}",
+  "password": "NewPassword123!"
+}
+
 ### List Budgets With Pagination
 GET {{baseUrl}}/api/budgets?page=1&limit=10
 Authorization: Bearer {{accessToken}}

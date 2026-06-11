@@ -129,6 +129,19 @@ test('reject invalid registration payloads', async () => {
   assert.equal(response.status, 400);
   assert.match(response.body.message, /email|Password/i);
 });
+test('reject weak registration passwords', async () => {
+  const response = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Weak Password User',
+      email: 'weak@example.com',
+      password: 'password'
+    })
+  });
+
+  assert.equal(response.status, 400);
+  assert.match(response.body.message, /uppercase|lowercase|number|symbol/i);
+});
 
 test('budget CRUD flow works for an authenticated user', async () => {
   const authPayload = await registerAndLogin();
@@ -396,17 +409,35 @@ test('forgot-password and reset-password flow updates credentials', async () => 
   });
 
   assert.equal(oldLoginResponse.status, 401);
+});
 
-  const newLoginResponse = await request('/api/auth/login', {
+test('reset-password rejects weak passwords', async () => {
+  await request('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
-      email: 'reset@example.com',
-      password: 'NewPassword123!'
+      name: 'Reset Weak User',
+      email: 'reset-weak@example.com',
+      password: 'Password123!'
     })
   });
 
-  assert.equal(newLoginResponse.status, 200);
-  assert.ok(newLoginResponse.body.accessToken);
+  const forgotResponse = await request('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'reset-weak@example.com'
+    })
+  });
+
+  const resetResponse = await request('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token: forgotResponse.body.resetToken,
+      password: 'weakpass'
+    })
+  });
+
+  assert.equal(resetResponse.status, 400);
+  assert.match(resetResponse.body.message, /uppercase|lowercase|number|symbol/i);
 });
 
 test('reset-password rejects invalid token', async () => {

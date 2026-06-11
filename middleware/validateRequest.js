@@ -9,6 +9,14 @@ const sendValidationError = (res, message) =>
 
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 
+const isStrongPassword = (value) =>
+  typeof value === 'string' &&
+  value.length >= 8 &&
+  /[a-z]/.test(value) &&
+  /[A-Z]/.test(value) &&
+  /\d/.test(value) &&
+  /[^A-Za-z0-9]/.test(value);
+
 const isValidEmail = (value) =>
   typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
@@ -79,8 +87,11 @@ const validateRegistration = (req, res, next) => {
     return sendValidationError(res, 'A valid email is required');
   }
 
-  if (typeof password !== 'string' || password.length < 8) {
-    return sendValidationError(res, 'Password must be at least 8 characters long');
+  if (!isStrongPassword(password)) {
+    return sendValidationError(
+      res,
+      'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol'
+    );
   }
 
   return next();
@@ -217,8 +228,11 @@ const validateResetPasswordPayload = (req, res, next) => {
     return sendValidationError(res, 'Reset token is required');
   }
 
-  if (typeof req.body.password !== 'string' || req.body.password.length < 8) {
-    return sendValidationError(res, 'Password must be at least 8 characters long');
+  if (!isStrongPassword(req.body.password)) {
+    return sendValidationError(
+      res,
+      'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol'
+    );
   }
 
   return next();

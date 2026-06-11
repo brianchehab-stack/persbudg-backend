@@ -40,6 +40,25 @@ Login and registration return:
 Use `POST /api/auth/refresh` with the refresh token to get a new token pair.
 Use `POST /api/auth/logout` with an access token to clear the stored refresh token.
 
+Forgot password flow:
+
+1. Call `POST /api/auth/forgot-password` with the user's email.
+2. In development, the response includes a `resetToken`.
+3. Call `POST /api/auth/reset-password` with the reset token and a new strong password.
+
+The reset password screen in the frontend should submit:
+
+- `token`
+- `password`
+
+Password rules:
+
+- at least 8 characters
+- one uppercase letter
+- one lowercase letter
+- one number
+- one symbol
+
 ## Demo Data
 
 Run:
