@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 
 const TransactionSchema = new mongoose.Schema(
 	{
+		ownerId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'User',
+			required: true,
+			index: true
+		},
 		user: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: 'User',
@@ -12,6 +18,13 @@ const TransactionSchema = new mongoose.Schema(
 			type: mongoose.Schema.Types.ObjectId,
 			ref: 'User',
 			index: true
+		},
+		ownerUsername: {
+			type: String,
+			trim: true,
+			lowercase: true,
+			index: true,
+			default: null
 		},
 		budget: {
 			type: mongoose.Schema.Types.ObjectId,
@@ -47,7 +60,25 @@ const TransactionSchema = new mongoose.Schema(
 	}
 );
 
+TransactionSchema.index({ ownerId: 1, date: -1 });
+
 TransactionSchema.pre('validate', function syncLegacyUserFields() {
+	if (this.ownerId && !this.user) {
+		this.user = this.ownerId;
+	}
+
+	if (this.ownerId && !this.userId) {
+		this.userId = this.ownerId;
+	}
+
+	if (!this.ownerId && this.user) {
+		this.ownerId = this.user;
+	}
+
+	if (!this.ownerId && this.userId) {
+		this.ownerId = this.userId;
+	}
+
 	if (this.user && !this.userId) {
 		this.userId = this.user;
 	}

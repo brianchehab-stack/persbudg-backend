@@ -6,10 +6,15 @@ import Transaction from '../models/Transaction.js';
 const isValidId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id ?? ''));
 
 const buildOwnershipFilter = (userId) => ({
-	$or: [{ user: userId }, { userId }]
+	ownerId: userId
 });
 
 const migrateLegacyBudgetOwnership = async (userId) => {
+	await Budget.collection.updateMany(
+		{ ownerId: { $exists: false }, $or: [{ user: userId }, { userId }] },
+		{ $set: { ownerId: userId } }
+	);
+
 	// Docs with userId only — backfill user
 	await Budget.collection.updateMany(
 		{ user: { $exists: false }, userId },
@@ -37,6 +42,14 @@ const normalizeBudgetPeriod = (period) => {
 	}
 
 	return period.trim().toLowerCase();
+};
+
+const logBudgetWrite = (action, userId, budgetId) => {
+	if (process.env.NODE_ENV === 'test') {
+		return;
+	}
+
+	console.info(`[budget:${action}] ownerId=${String(userId)} budgetId=${String(budgetId)}`);
 };
 
 const listBudgets = async (req, res) => {
@@ -67,7 +80,7 @@ const getBudgetSummary = async (req, res) => {
 	const expenses = await Transaction.aggregate([
 		{
 			$match: {
-				$or: [{ user: req.user._id }, { userId: req.user._id }],
+				ownerId: req.user._id,
 				type: 'expense',
 				budget: { $ne: null }
 			}
@@ -130,8 +143,10 @@ const createBudget = async (req, res) => {
 	}
 
 	const budget = await Budget.create({
+		ownerId: req.user._id,
 		user: req.user._id,
 		userId: req.user._id,
+		ownerUsername: req.user.email,
 		name,
 		category,
 		amount: numericAmount,
@@ -140,6 +155,8 @@ const createBudget = async (req, res) => {
 		endDate,
 		notes
 	});
+
+	logBudgetWrite('create', req.user._id, budget._id);
 
 	return res.status(201).json(budget);
 };
@@ -177,6 +194,7 @@ const updateBudget = async (req, res) => {
 	}
 
 	await budget.save();
+	logBudgetWrite('update', req.user._id, budget._id);
 
 	return res.json(budget);
 };
@@ -197,10 +215,11 @@ const deleteBudget = async (req, res) => {
 	}
 
 	await Transaction.updateMany(
-		{ budget: budget._id, user: req.user._id },
+		{ budget: budget._id, ownerId: req.user._id },
 		{ $unset: { budget: 1 } }
 	);
 	await budget.deleteOne();
+	logBudgetWrite('delete', req.user._id, budget._id);
 
 	return res.json({ message: 'Budget deleted successfully' });
 };

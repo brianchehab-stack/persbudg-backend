@@ -11,10 +11,15 @@ import Transaction from '../models/Transaction.js';
 const isValidId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id ?? ''));
 
 const buildTransactionOwnershipFilter = (userId) => ({
-	$or: [{ user: userId }, { userId }]
+	ownerId: userId
 });
 
 const migrateLegacyTransactionFields = async (userId) => {
+	await Transaction.collection.updateMany(
+		{ ownerId: { $exists: false }, $or: [{ user: userId }, { userId }] },
+		{ $set: { ownerId: userId } }
+	);
+
 	// Docs saved with userId only — backfill user
 	await Transaction.collection.updateMany(
 		{ user: { $exists: false }, userId },
@@ -48,6 +53,16 @@ const normalizeNote = (value) => {
 	}
 
 	return String(value);
+};
+
+const logTransactionWrite = (action, userId, transactionId) => {
+	if (process.env.NODE_ENV === 'test') {
+		return;
+	}
+
+	console.info(
+		`[transaction:${action}] ownerId=${String(userId)} transactionId=${String(transactionId)}`
+	);
 };
 
 const withNoteField = (transaction) => {
@@ -127,7 +142,7 @@ const getTransactionSummary = async (req, res) => {
 	await migrateLegacyTransactionFields(req.user._id);
 
 	const ownershipMatch = {
-		$or: [{ user: req.user._id }, { userId: req.user._id }]
+		ownerId: req.user._id
 	};
 
 	const [summary, categoryBreakdown] = await Promise.all([
@@ -249,7 +264,7 @@ const createTransaction = async (req, res) => {
 			return res.status(400).json({ message: 'Invalid budget id' });
 		}
 
-		const existingBudget = await Budget.findOne({ _id: budget, user: req.user._id });
+		const existingBudget = await Budget.findOne({ _id: budget, ownerId: req.user._id });
 
 		if (!existingBudget) {
 			return res.status(404).json({ message: 'Budget not found' });
@@ -259,8 +274,10 @@ const createTransaction = async (req, res) => {
 	}
 
 	const transaction = await Transaction.create({
+		ownerId: req.user._id,
 		user: req.user._id,
 		userId: req.user._id,
+		ownerUsername: req.user.email,
 		budget: budgetId,
 		type,
 		category: normalizedCategory,
@@ -268,6 +285,8 @@ const createTransaction = async (req, res) => {
 		description: note,
 		date
 	});
+
+	logTransactionWrite('create', req.user._id, transaction._id);
 
 	const populatedTransaction = await transaction.populate('budget', 'name category amount');
 	return res.status(201).json(withNoteField(populatedTransaction));
@@ -344,6 +363,7 @@ const updateTransaction = async (req, res) => {
 	}
 
 	await transaction.save();
+	logTransactionWrite('update', req.user._id, transaction._id);
 	const populatedTransaction = await transaction.populate('budget', 'name category amount');
 
 	return res.json(withNoteField(populatedTransaction));
@@ -368,6 +388,7 @@ const deleteTransaction = async (req, res) => {
 	}
 
 	await transaction.deleteOne();
+	logTransactionWrite('delete', req.user._id, transaction._id);
 	return res.json({ message: 'Transaction deleted successfully' });
 };
 

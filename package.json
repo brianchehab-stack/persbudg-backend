@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "seed": "node scripts/seed.js",
     "seed:clear": "node scripts/seed.js --clear",
+    "migrate:owner-id": "node scripts/backfill-owner-id.js",
     "test": "mocha tests/**/*.test.js"
   },
   "keywords": [],

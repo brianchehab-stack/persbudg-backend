@@ -117,6 +117,10 @@ const validateBudgetPayload = (req, res, next) => {
   const normalizedPeriod =
     typeof period === 'string' ? period.trim().toLowerCase() : period;
 
+  if (req.body.ownerId !== undefined || req.body.userId !== undefined || req.body.user !== undefined) {
+    return sendValidationError(res, 'Owner fields are managed by the server');
+  }
+
   if (isCreate && !isNonEmptyString(name)) {
     return sendValidationError(res, 'Name is required');
   }
@@ -155,6 +159,10 @@ const validateTransactionPayload = (req, res, next) => {
   const { type, category, amount, date, note, description } = req.body;
   const isCreate = req.method === 'POST';
   const normalizedCategory = normalizeCategory(category);
+
+  if (req.body.ownerId !== undefined || req.body.userId !== undefined || req.body.user !== undefined) {
+    return sendValidationError(res, 'Owner fields are managed by the server');
+  }
 
   if (isCreate && !['income', 'expense'].includes(type)) {
     return sendValidationError(res, 'Type must be income or expense');

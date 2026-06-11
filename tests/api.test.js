@@ -106,6 +106,10 @@ after(async () => {
 test('register, login, and fetch current user', async () => {
   const authPayload = await registerAndLogin();
 
+  assert.ok(authPayload.entries);
+  assert.ok(Array.isArray(authPayload.entries.budgets));
+  assert.ok(Array.isArray(authPayload.entries.transactions));
+
   const meResponse = await request('/api/auth/me', {
     headers: {
       Authorization: `Bearer ${authPayload.accessToken}`
@@ -324,6 +328,102 @@ test('transaction creation rejects invalid category for type', async () => {
 
   assert.equal(createResponse.status, 400);
   assert.match(createResponse.body.message, /Category.*type/i);
+});
+
+test('enforces strict per-user data isolation', async () => {
+  const userA = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'User A',
+      email: 'usera@example.com',
+      password: 'Password123!'
+    })
+  });
+
+  const userB = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'User B',
+      email: 'userb@example.com',
+      password: 'Password123!'
+    })
+  });
+
+  assert.equal(userA.status, 201);
+  assert.equal(userB.status, 201);
+
+  const budgetA = await request('/api/budgets', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${userA.body.accessToken}`
+    },
+    body: JSON.stringify({
+      name: 'A Budget',
+      category: 'Food',
+      amount: 120,
+      period: 'monthly'
+    })
+  });
+
+  assert.equal(budgetA.status, 201);
+
+  const txA = await request('/api/transactions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${userA.body.accessToken}`
+    },
+    body: JSON.stringify({
+      budget: budgetA.body._id,
+      type: 'expense',
+      category: 'Groceries',
+      amount: 35,
+      note: 'User A only'
+    })
+  });
+
+  assert.equal(txA.status, 201);
+
+  const budgetsVisibleToB = await request('/api/budgets', {
+    headers: {
+      Authorization: `Bearer ${userB.body.accessToken}`
+    }
+  });
+
+  const txVisibleToB = await request('/api/transactions', {
+    headers: {
+      Authorization: `Bearer ${userB.body.accessToken}`
+    }
+  });
+
+  assert.equal(budgetsVisibleToB.status, 200);
+  assert.equal(txVisibleToB.status, 200);
+  assert.equal(budgetsVisibleToB.body.items.length, 0);
+  assert.equal(txVisibleToB.body.items.length, 0);
+
+  const bReadsABudget = await request(`/api/budgets/${budgetA.body._id}`, {
+    headers: {
+      Authorization: `Bearer ${userB.body.accessToken}`
+    }
+  });
+
+  const bUpdatesABudget = await request(`/api/budgets/${budgetA.body._id}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${userB.body.accessToken}`
+    },
+    body: JSON.stringify({ amount: 999 })
+  });
+
+  const bDeletesATx = await request(`/api/transactions/${txA.body._id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${userB.body.accessToken}`
+    }
+  });
+
+  assert.equal(bReadsABudget.status, 404);
+  assert.equal(bUpdatesABudget.status, 404);
+  assert.equal(bDeletesATx.status, 404);
 });
 
 test('refresh and logout endpoints manage token lifecycle', async () => {

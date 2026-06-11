@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
+import Budget from '../models/Budget.js';
+import Transaction from '../models/Transaction.js';
 import User from '../models/User.js';
 
 const accessTokenExpiresIn = '15m';
@@ -17,9 +19,33 @@ const generateRefreshToken = (userId) =>
 		expiresIn: refreshTokenExpiresIn
 	});
 
+const buildOwnershipFilter = (userId) => ({
+	ownerId: userId
+});
+
+const buildEntriesPayload = async (userId) => {
+	const filter = buildOwnershipFilter(userId);
+	const [budgets, transactions] = await Promise.all([
+		Budget.find(filter).sort({ createdAt: -1 }).lean(),
+		Transaction.find(filter)
+			.populate('budget', 'name category amount')
+			.sort({ date: -1, createdAt: -1 })
+			.lean()
+	]);
+
+	return {
+		budgets,
+		transactions: transactions.map((transaction) => ({
+			...transaction,
+			note: transaction.description ?? ''
+		}))
+	};
+};
+
 const buildAuthResponse = async (user, message) => {
 	const accessToken = generateAccessToken(user._id);
 	const refreshToken = generateRefreshToken(user._id);
+	const entries = await buildEntriesPayload(user._id);
 
 	user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 	await user.save();
@@ -29,6 +55,7 @@ const buildAuthResponse = async (user, message) => {
 		accessToken,
 		refreshToken,
 		token: accessToken,
+		entries,
 		user: {
 			id: user._id,
 			name: user.name,
@@ -130,9 +157,9 @@ const refreshAuth = async (req, res) => {
 };
 
 const logoutUser = async (req, res) => {
-	if (req.user) {
-		req.user.refreshTokenHash = null;
-		await req.user.save();
+	if (req.userDoc) {
+		req.userDoc.refreshTokenHash = null;
+		await req.userDoc.save();
 	}
 
 	return res.json({ message: 'Logged out successfully' });
