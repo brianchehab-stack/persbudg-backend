@@ -46,6 +46,10 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/transactions?page=1&limit=10&type=expense&category=Food
 Authorization: Bearer {{accessToken}}
 
+### Transaction Category Options
+GET {{baseUrl}}/api/transactions/category-options
+Authorization: Bearer {{accessToken}}
+
 ### Current User
 GET {{baseUrl}}/api/auth/me
 Authorization: Bearer {{accessToken}}
@@ -103,7 +107,7 @@ Content-Type: application/json
   "type": "expense",
   "category": "Dining",
   "amount": 34.95,
-  "description": "Lunch meeting"
+  "note": "Lunch meeting"
 }
 
 ### Update Transaction
@@ -113,7 +117,7 @@ Content-Type: application/json
 
 {
   "amount": 40,
-  "description": "Updated lunch total"
+  "note": "Updated lunch total"
 }
 
 ### Delete Transaction

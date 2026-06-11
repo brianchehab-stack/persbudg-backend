@@ -3,6 +3,7 @@ import express from 'express';
 import {
 	createTransaction,
 	deleteTransaction,
+	getTransactionCategoryOptions,
 	getTransactionById,
 	getTransactionSummary,
 	listTransactions,
@@ -20,6 +21,7 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/', validatePaginationQuery, validateTransactionListQuery, listTransactions);
+router.get('/category-options', getTransactionCategoryOptions);
 router.get('/summary', getTransactionSummary);
 router.get('/:id', getTransactionById);
 router.post('/', validateTransactionPayload, createTransaction);

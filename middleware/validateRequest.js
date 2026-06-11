@@ -1,3 +1,9 @@
+import {
+  isKnownTransactionCategory,
+  isValidCategoryForType,
+  normalizeCategory
+} from '../config/transactionCategories.js';
+
 const sendValidationError = (res, message) =>
   res.status(400).json({ message });
 
@@ -33,6 +39,7 @@ const validatePaginationQuery = (req, res, next) => {
 
 const validateTransactionListQuery = (req, res, next) => {
   const { type, category, budget, startDate, endDate } = req.query;
+  const normalizedCategory = normalizeCategory(category);
 
   if (type !== undefined && !['income', 'expense'].includes(type)) {
     return sendValidationError(res, 'Type filter must be income or expense');
@@ -40,6 +47,14 @@ const validateTransactionListQuery = (req, res, next) => {
 
   if (category !== undefined && !isNonEmptyString(category)) {
     return sendValidationError(res, 'Category filter must be a non-empty string');
+  }
+
+  if (category !== undefined && !isKnownTransactionCategory(normalizedCategory)) {
+    return sendValidationError(res, 'Category filter is not supported');
+  }
+
+  if (type !== undefined && category !== undefined && !isValidCategoryForType(type, normalizedCategory)) {
+    return sendValidationError(res, 'Category filter must match the selected type');
   }
 
   if (budget !== undefined && typeof budget === 'string' && budget.trim().length === 0) {
@@ -121,8 +136,9 @@ const validateBudgetPayload = (req, res, next) => {
 };
 
 const validateTransactionPayload = (req, res, next) => {
-  const { type, category, amount, date } = req.body;
+  const { type, category, amount, date, note, description } = req.body;
   const isCreate = req.method === 'POST';
+  const normalizedCategory = normalizeCategory(category);
 
   if (isCreate && !['income', 'expense'].includes(type)) {
     return sendValidationError(res, 'Type must be income or expense');
@@ -140,6 +156,14 @@ const validateTransactionPayload = (req, res, next) => {
     return sendValidationError(res, 'Category must be a non-empty string');
   }
 
+  if (category !== undefined && !isKnownTransactionCategory(normalizedCategory)) {
+    return sendValidationError(res, 'Category is not supported');
+  }
+
+  if (type !== undefined && category !== undefined && !isValidCategoryForType(type, normalizedCategory)) {
+    return sendValidationError(res, 'Category must match the selected type');
+  }
+
   if (isCreate && amount === undefined) {
     return sendValidationError(res, 'Amount is required');
   }
@@ -150,6 +174,14 @@ const validateTransactionPayload = (req, res, next) => {
     if (Number.isNaN(numericAmount) || numericAmount < 0) {
       return sendValidationError(res, 'Amount must be a non-negative number');
     }
+  }
+
+  if (note !== undefined && typeof note !== 'string') {
+    return sendValidationError(res, 'Note must be a string');
+  }
+
+  if (description !== undefined && typeof description !== 'string') {
+    return sendValidationError(res, 'Description must be a string');
   }
 
   if (!isValidDateValue(date)) {

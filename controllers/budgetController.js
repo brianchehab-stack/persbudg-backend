@@ -5,6 +5,10 @@ import Transaction from '../models/Transaction.js';
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+const buildOwnershipFilter = (userId) => ({
+	$or: [{ user: userId }, { userId }]
+});
+
 const migrateLegacyBudgetOwnership = async (userId) => {
 	await Budget.collection.updateMany(
 		{ user: { $exists: false }, userId },
@@ -24,7 +28,7 @@ const listBudgets = async (req, res) => {
 	await migrateLegacyBudgetOwnership(req.user._id);
 
 	const { page, limit, skip } = buildPagination(req.query);
-	const filter = { user: req.user._id };
+	const filter = buildOwnershipFilter(req.user._id);
 	const [budgets, total] = await Promise.all([
 		Budget.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
 		Budget.countDocuments(filter)
@@ -44,7 +48,7 @@ const listBudgets = async (req, res) => {
 const getBudgetSummary = async (req, res) => {
 	await migrateLegacyBudgetOwnership(req.user._id);
 
-	const budgets = await Budget.find({ user: req.user._id }).lean();
+	const budgets = await Budget.find(buildOwnershipFilter(req.user._id)).lean();
 	const expenses = await Transaction.aggregate([
 		{
 			$match: {
@@ -86,12 +90,14 @@ const getBudgetById = async (req, res) => {
 	await migrateLegacyBudgetOwnership(req.user._id);
 
 	const budget = await Budget.findOne({ _id: id, user: req.user._id });
+	
+	const ownedBudget = budget || (await Budget.findOne({ _id: id, userId: req.user._id }));
 
-	if (!budget) {
+	if (!ownedBudget) {
 		return res.status(404).json({ message: 'Budget not found' });
 	}
 
-	return res.json(budget);
+	return res.json(ownedBudget);
 };
 
 const createBudget = async (req, res) => {
@@ -111,6 +117,7 @@ const createBudget = async (req, res) => {
 
 	const budget = await Budget.create({
 		user: req.user._id,
+		userId: req.user._id,
 		name,
 		category,
 		amount: numericAmount,
@@ -132,7 +139,7 @@ const updateBudget = async (req, res) => {
 
 	await migrateLegacyBudgetOwnership(req.user._id);
 
-	const budget = await Budget.findOne({ _id: id, user: req.user._id });
+	const budget = await Budget.findOne({ _id: id, ...buildOwnershipFilter(req.user._id) });
 
 	if (!budget) {
 		return res.status(404).json({ message: 'Budget not found' });
@@ -169,7 +176,7 @@ const deleteBudget = async (req, res) => {
 
 	await migrateLegacyBudgetOwnership(req.user._id);
 
-	const budget = await Budget.findOne({ _id: id, user: req.user._id });
+	const budget = await Budget.findOne({ _id: id, ...buildOwnershipFilter(req.user._id) });
 
 	if (!budget) {
 		return res.status(404).json({ message: 'Budget not found' });

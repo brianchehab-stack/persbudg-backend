@@ -198,6 +198,16 @@ test('budget CRUD flow works for an authenticated user', async () => {
 test('transaction CRUD and summary flow works for an authenticated user', async () => {
   const authPayload = await registerAndLogin();
 
+  const categoryOptionsResponse = await request('/api/transactions/category-options', {
+    headers: {
+      Authorization: `Bearer ${authPayload.accessToken}`
+    }
+  });
+
+  assert.equal(categoryOptionsResponse.status, 200);
+  assert.ok(categoryOptionsResponse.body.income.includes('Salary'));
+  assert.ok(categoryOptionsResponse.body.expense.includes('Dining'));
+
   const budgetResponse = await request('/api/budgets', {
     method: 'POST',
     headers: {
@@ -223,12 +233,13 @@ test('transaction CRUD and summary flow works for an authenticated user', async 
       type: 'expense',
       category: 'Fuel',
       amount: 45.5,
-      description: 'Gas station'
+      note: 'Gas station'
     })
   });
 
   assert.equal(createResponse.status, 201);
   assert.equal(createResponse.body.category, 'Fuel');
+  assert.equal(createResponse.body.note, 'Gas station');
 
   const transactionId = createResponse.body._id;
 
@@ -249,12 +260,13 @@ test('transaction CRUD and summary flow works for an authenticated user', async 
     },
     body: JSON.stringify({
       amount: 50,
-      description: 'Updated fuel total'
+      note: 'Updated fuel total'
     })
   });
 
   assert.equal(updateResponse.status, 200);
   assert.equal(updateResponse.body.amount, 50);
+  assert.equal(updateResponse.body.note, 'Updated fuel total');
 
   const listResponse = await request('/api/transactions', {
     headers: {
@@ -275,6 +287,26 @@ test('transaction CRUD and summary flow works for an authenticated user', async 
 
   assert.equal(deleteResponse.status, 200);
   assert.match(deleteResponse.body.message, /deleted/i);
+});
+
+test('transaction creation rejects invalid category for type', async () => {
+  const authPayload = await registerAndLogin();
+
+  const createResponse = await request('/api/transactions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authPayload.accessToken}`
+    },
+    body: JSON.stringify({
+      type: 'income',
+      category: 'Dining',
+      amount: 100,
+      description: 'Should fail'
+    })
+  });
+
+  assert.equal(createResponse.status, 400);
+  assert.match(createResponse.body.message, /Category.*type/i);
 });
 
 test('refresh and logout endpoints manage token lifecycle', async () => {

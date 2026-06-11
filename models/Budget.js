@@ -8,6 +8,11 @@ const BudgetSchema = new mongoose.Schema(
 			required: true,
 			index: true
 		},
+		userId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'User',
+			index: true
+		},
 		name: {
 			type: String,
 			required: true,
@@ -45,5 +50,15 @@ const BudgetSchema = new mongoose.Schema(
 		timestamps: true
 	}
 );
+
+BudgetSchema.pre('validate', function syncLegacyUserFields() {
+	if (this.user && !this.userId) {
+		this.userId = this.user;
+	}
+
+	if (!this.user && this.userId) {
+		this.user = this.userId;
+	}
+});
 
 export default mongoose.model('Budget', BudgetSchema);

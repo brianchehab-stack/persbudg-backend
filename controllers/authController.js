@@ -84,7 +84,7 @@ const loginUser = async (req, res) => {
 		return res.status(401).json({ message: 'Invalid credentials' });
 	}
 
-	const authPayload = await buildAuthResponse(user, 'Login successful');
+	const authPayload = await buildAuthResponse(user, `Welcome ${user.name}`);
 
 	return res.json(authPayload);
 };

@@ -1,5 +1,10 @@
 import mongoose from 'mongoose';
 
+import {
+	isValidCategoryForType,
+	normalizeCategory,
+	transactionCategoryOptions
+} from '../config/transactionCategories.js';
 import Budget from '../models/Budget.js';
 import Transaction from '../models/Transaction.js';
 
@@ -25,6 +30,27 @@ const buildPagination = (query) => {
 	return { page, limit, skip };
 };
 
+const normalizeNote = (value) => {
+	if (value === undefined || value === null) {
+		return undefined;
+	}
+
+	return String(value);
+};
+
+const withNoteField = (transaction) => {
+	const plainTransaction = transaction?.toObject ? transaction.toObject() : transaction;
+
+	if (!plainTransaction) {
+		return plainTransaction;
+	}
+
+	return {
+		...plainTransaction,
+		note: plainTransaction.description ?? ''
+	};
+};
+
 const buildTransactionFilters = (userId, query) => {
 	const filters = { user: userId };
 
@@ -33,7 +59,7 @@ const buildTransactionFilters = (userId, query) => {
 	}
 
 	if (query.category) {
-		filters.category = query.category;
+		filters.category = normalizeCategory(query.category);
 	}
 
 	if (query.budget && isValidId(query.budget)) {
@@ -55,6 +81,10 @@ const buildTransactionFilters = (userId, query) => {
 	return filters;
 };
 
+const getTransactionCategoryOptions = async (req, res) => {
+	return res.json(transactionCategoryOptions);
+};
+
 const listTransactions = async (req, res) => {
 	await migrateLegacyTransactionFields(req.user._id);
 
@@ -68,9 +98,10 @@ const listTransactions = async (req, res) => {
 			.limit(limit),
 		Transaction.countDocuments(filters)
 	]);
+	const transactionItems = transactions.map((transaction) => withNoteField(transaction));
 
 	return res.json({
-		items: transactions,
+		items: transactionItems,
 		pagination: {
 			page,
 			limit,
@@ -130,17 +161,23 @@ const getTransactionById = async (req, res) => {
 		return res.status(404).json({ message: 'Transaction not found' });
 	}
 
-	return res.json(transaction);
+	return res.json(withNoteField(transaction));
 };
 
 const createTransaction = async (req, res) => {
 	await migrateLegacyTransactionFields(req.user._id);
 
-	const { type, category, amount, description, date } = req.body;
+	const { type, category, amount, date } = req.body;
 	const budget = req.body.budget ?? req.body.budgetId;
+	const note = normalizeNote(req.body.note ?? req.body.description);
+	const normalizedCategory = normalizeCategory(category);
 
-	if (!type || !category || amount === undefined) {
+	if (!type || !normalizedCategory || amount === undefined) {
 		return res.status(400).json({ message: 'Type, category, and amount are required' });
+	}
+
+	if (!isValidCategoryForType(type, normalizedCategory)) {
+		return res.status(400).json({ message: 'Category must match the selected type' });
 	}
 
 	const numericAmount = Number(amount);
@@ -168,14 +205,14 @@ const createTransaction = async (req, res) => {
 		user: req.user._id,
 		budget: budgetId,
 		type,
-		category,
+		category: normalizedCategory,
 		amount: numericAmount,
-		description,
+		description: note,
 		date
 	});
 
 	const populatedTransaction = await transaction.populate('budget', 'name category amount');
-	return res.status(201).json(populatedTransaction);
+	return res.status(201).json(withNoteField(populatedTransaction));
 };
 
 const updateTransaction = async (req, res) => {
@@ -194,6 +231,14 @@ const updateTransaction = async (req, res) => {
 	}
 
 	const nextBudget = req.body.budget ?? req.body.budgetId;
+	const nextType = req.body.type ?? transaction.type;
+	const nextCategoryRaw = req.body.category ?? transaction.category;
+	const nextCategory = normalizeCategory(nextCategoryRaw);
+	const nextNote = normalizeNote(req.body.note ?? req.body.description);
+
+	if (!isValidCategoryForType(nextType, nextCategory)) {
+		return res.status(400).json({ message: 'Category must match the selected type' });
+	}
 
 	if (nextBudget !== undefined) {
 		if (nextBudget === null || nextBudget === '') {
@@ -213,11 +258,15 @@ const updateTransaction = async (req, res) => {
 		}
 	}
 
-	const updatableFields = ['type', 'category', 'description', 'date'];
+	const updatableFields = ['type', 'category', 'date'];
 	for (const field of updatableFields) {
 		if (req.body[field] !== undefined) {
-			transaction[field] = req.body[field];
+			transaction[field] = field === 'category' ? nextCategory : req.body[field];
 		}
+	}
+
+	if (nextNote !== undefined) {
+		transaction.description = nextNote;
 	}
 
 	if (req.body.amount !== undefined) {
@@ -233,7 +282,7 @@ const updateTransaction = async (req, res) => {
 	await transaction.save();
 	const populatedTransaction = await transaction.populate('budget', 'name category amount');
 
-	return res.json(populatedTransaction);
+	return res.json(withNoteField(populatedTransaction));
 };
 
 const deleteTransaction = async (req, res) => {
@@ -257,6 +306,7 @@ const deleteTransaction = async (req, res) => {
 
 export {
 	listTransactions,
+	getTransactionCategoryOptions,
 	getTransactionSummary,
 	getTransactionById,
 	createTransaction,
