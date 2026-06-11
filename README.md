@@ -1,21 +1,15 @@
 # persbudg-backend
 
-Express and MongoDB backend for personal budgeting with JWT auth, budgets, transactions, refresh tokens, and pagination.
+Express and MongoDB backend for personal budgeting with JWT auth, strict per-user isolation, budgets, transactions, password reset, refresh tokens, and pagination.
 
-## Setup
+## Quick Start
 
-1. Install dependencies:
-   npm install
-2. Start MongoDB locally.
-3. Configure environment variables in `.env`.
-4. Start the API:
-   npm start
+1. Install dependencies: `npm install`
+2. Configure `.env`
+3. Start MongoDB
+4. Run the API: `npm start`
 
-## Environment
-
-Example values are in `.env.example`.
-
-Required variables:
+Required environment variables:
 
 - `PORT=5000`
 - `MONGO_URI=mongodb://127.0.0.1:27017/persbudg`
@@ -26,63 +20,54 @@ Required variables:
 
 - `npm start` starts the API.
 - `npm run dev` starts the API with nodemon.
-- `npm run seed` clears and repopulates demo data.
-- `npm run seed:clear` clears seeded data.
-- `npm test` runs API integration tests against `persbudg_test`.
+- `npm run seed` seeds demo users, budgets, and transactions.
+- `npm run seed:clear` removes seeded demo data.
+- `npm run migrate:owner-id` backfills `ownerId` for legacy budget and transaction records.
+- `npm test` runs the API integration tests.
 
-## Auth Flow
+## Auth
 
 Login and registration return:
 
-- `accessToken` for API requests
-- `refreshToken` for renewing access tokens
+- `accessToken`
+- `refreshToken`
+- `user` with `id`, `name`, and `email`
+- `entries` with user-scoped `budgets` and `transactions`
 
-Use `POST /api/auth/refresh` with the refresh token to get a new token pair.
-Use `POST /api/auth/logout` with an access token to clear the stored refresh token.
+Use `GET /api/auth/me` after login or page refresh to restore the current user and reload saved entries.
+Use `POST /api/auth/refresh` to get a new token pair.
+Use `POST /api/auth/logout` to clear the stored refresh token.
 
 Forgot password flow:
 
 1. Call `POST /api/auth/forgot-password` with the user's email.
 2. In development, the response includes a `resetToken`.
-3. Call `POST /api/auth/reset-password` with the reset token and a new strong password.
-
-The reset password screen in the frontend should submit:
-
-- `token`
-- `password`
+3. Call `POST /api/auth/reset-password` with the reset token and a strong new password.
 
 Password rules:
 
 - at least 8 characters
-- one uppercase letter
-- one lowercase letter
-- one number
-- one symbol
+- uppercase letter
+- lowercase letter
+- number
+- symbol
 
-## Demo Data
+## Data Isolation
 
-Run:
+All owned records are scoped server-side with `ownerId`.
 
-```bash
-npm run seed
-```
+- Budgets use `ownerId`.
+- Transactions use `ownerId`.
+- The API never accepts `ownerId` from request bodies.
+- Read, update, and delete routes always include the authenticated owner in the query.
 
-Demo credentials:
+This prevents one user from reading or overwriting another user's data.
 
-- Email: `demo@persbudg.local`
-- Password: `Password123!`
+## Useful Endpoints
 
-## API Usage
-
-Example requests are in `requests.http`.
-
-Main routes:
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `GET /api/transactions/summary`
+- `GET /api/transactions/category-options`
 - `GET|POST|PUT|DELETE /api/budgets`
 - `GET|POST|PUT|DELETE /api/transactions`
 
@@ -91,72 +76,53 @@ List endpoints support pagination and filters:
 - `GET /api/budgets?page=1&limit=10`
 - `GET /api/transactions?page=1&limit=10&type=expense&category=Food`
 
-Protected routes require:
+`GET /api/transactions/summary` returns:
 
-```http
-Authorization: Bearer <jwt>
-```
+- `income`
+- `expense`
+- `balance`
+- `incomeByCategory`
+- `expenseByCategory`
 
-## Validation Notes
+Those category arrays are ready for pie chart use in the frontend.
 
-Route-level validation rejects malformed payloads before controller logic runs.
+## Validation
 
-Examples:
-
-- registration requires a valid email and password length >= 8
-- budgets require a non-negative numeric amount
+- registration requires a valid email and strong password
+- budget names accept common frontend aliases like `budgetName` and `title`
+- budgets require a non-negative amount
 - transactions require `type` to be `income` or `expense`
-- list endpoints require positive integer `page` and `limit` values when supplied
+- list endpoints require positive integer `page` and `limit`
 
-## Testing
+## Demo Data
 
-`npm test` uses Node's built-in test runner and a separate MongoDB database:
+Run `npm run seed`.
 
-- database: `mongodb://127.0.0.1:27017/persbudg_test`
-- server: ephemeral local port
+Demo credentials:
 
-Continuous integration runs `npm test` on push and pull requests.
+- Email: `demo@persbudg.local`
+- Password: `Password123!`
 
-If local MongoDB is not running, the tests will fail to connect.
+## Frontend Integration
 
-## Deploy on Render
-
-1. Create a new Web Service on Render from this repository.
-2. Use these settings:
-   - Runtime: Node
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-3. Add these environment variables in Render:
-   - `MONGO_URI=<your MongoDB connection string>`
-   - `JWT_SECRET=<a long random secret>`
-   - `FRONTEND_URLS=<your frontend URL>`
-   - `PORT=10000` is not required; Render injects `PORT` automatically.
-4. If you deploy from `render.yaml`, Render will use the same settings automatically.
-
-## Connect Frontend to Backend
-
-1. Set backend environment variables in `.env`:
-   - `PORT=5000`
-   - `FRONTEND_URLS=<your frontend URL>`
-   - Example: `FRONTEND_URLS=http://localhost:5173`
-2. Start backend:
-   - `npm run dev`
-3. In your frontend app, point API requests to:
-   - `http://localhost:5000`
-4. Send JWT in the `Authorization` header for protected endpoints:
+Send JWTs in the `Authorization` header:
 
 ```http
 Authorization: Bearer <accessToken>
 ```
 
-Example frontend request:
+Example:
 
 ```js
-const API_BASE_URL = 'http://localhost:5000';
-
-const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+const response = await fetch('http://localhost:5000/api/auth/me', {
   headers: {
     Authorization: `Bearer ${accessToken}`
   }
 });
 ```
+
+## Testing
+
+`npm test` uses Node's built-in test runner against `mongodb://127.0.0.1:27017/persbudg_test`.
+
+If local MongoDB is not running, the tests will fail to connect.
