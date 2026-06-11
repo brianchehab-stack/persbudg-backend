@@ -118,6 +118,8 @@ test('register, login, and fetch current user', async () => {
 
   assert.equal(meResponse.status, 200);
   assert.equal(meResponse.body.user.email, 'test@example.com');
+  assert.ok(Array.isArray(meResponse.body.entries.budgets));
+  assert.ok(Array.isArray(meResponse.body.entries.transactions));
 });
 
 test('reject invalid registration payloads', async () => {

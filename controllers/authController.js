@@ -117,7 +117,12 @@ const loginUser = async (req, res) => {
 };
 
 const getCurrentUser = async (req, res) => {
-	return res.json({ user: req.user });
+	const entries = await buildEntriesPayload(req.user._id);
+
+	return res.json({
+		user: req.user,
+		entries
+	});
 };
 
 const refreshAuth = async (req, res) => {
