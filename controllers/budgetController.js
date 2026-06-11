@@ -24,6 +24,14 @@ const buildPagination = (query) => {
 	return { page, limit, skip };
 };
 
+const normalizeBudgetPeriod = (period) => {
+	if (typeof period !== 'string') {
+		return period;
+	}
+
+	return period.trim().toLowerCase();
+};
+
 const listBudgets = async (req, res) => {
 	await migrateLegacyBudgetOwnership(req.user._id);
 
@@ -104,6 +112,7 @@ const createBudget = async (req, res) => {
 	await migrateLegacyBudgetOwnership(req.user._id);
 
 	const { name, category, amount, period, startDate, endDate, notes } = req.body;
+	const normalizedPeriod = normalizeBudgetPeriod(period);
 
 	if (!name || amount === undefined) {
 		return res.status(400).json({ message: 'Name and amount are required' });
@@ -121,7 +130,7 @@ const createBudget = async (req, res) => {
 		name,
 		category,
 		amount: numericAmount,
-		period,
+		period: normalizedPeriod,
 		startDate,
 		endDate,
 		notes
@@ -148,7 +157,7 @@ const updateBudget = async (req, res) => {
 	const updatableFields = ['name', 'category', 'period', 'startDate', 'endDate', 'notes'];
 	for (const field of updatableFields) {
 		if (req.body[field] !== undefined) {
-			budget[field] = req.body[field];
+			budget[field] = field === 'period' ? normalizeBudgetPeriod(req.body[field]) : req.body[field];
 		}
 	}
 

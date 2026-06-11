@@ -103,6 +103,8 @@ const validateLogin = (req, res, next) => {
 const validateBudgetPayload = (req, res, next) => {
   const { name, amount, period, startDate, endDate } = req.body;
   const isCreate = req.method === 'POST';
+  const normalizedPeriod =
+    typeof period === 'string' ? period.trim().toLowerCase() : period;
 
   if (isCreate && !isNonEmptyString(name)) {
     return sendValidationError(res, 'Name is required');
@@ -124,7 +126,10 @@ const validateBudgetPayload = (req, res, next) => {
     }
   }
 
-  if (period !== undefined && !['weekly', 'monthly', 'yearly', 'custom'].includes(period)) {
+  if (
+    normalizedPeriod !== undefined &&
+    !['weekly', 'monthly', 'yearly', 'custom'].includes(normalizedPeriod)
+  ) {
     return sendValidationError(res, 'Period must be weekly, monthly, yearly, or custom');
   }
 
