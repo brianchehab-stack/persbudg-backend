@@ -8,14 +8,26 @@ import {
 import Budget from '../models/Budget.js';
 import Transaction from '../models/Transaction.js';
 
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+const isValidId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id ?? ''));
+
+const buildTransactionOwnershipFilter = (userId) => ({
+	$or: [{ user: userId }, { userId }]
+});
 
 const migrateLegacyTransactionFields = async (userId) => {
+	// Docs saved with userId only — backfill user
 	await Transaction.collection.updateMany(
 		{ user: { $exists: false }, userId },
 		{ $set: { user: userId } }
 	);
 
+	// Docs saved with user only — backfill userId
+	await Transaction.collection.updateMany(
+		{ user: userId, userId: { $exists: false } },
+		{ $set: { userId } }
+	);
+
+	// Docs with budgetId but no budget
 	await Transaction.collection.updateMany(
 		{ user: userId, budget: { $exists: false }, budgetId: { $type: 'objectId' } },
 		[{ $set: { budget: '$budgetId' } }]
@@ -52,7 +64,7 @@ const withNoteField = (transaction) => {
 };
 
 const buildTransactionFilters = (userId, query) => {
-	const filters = { user: userId };
+	const filters = buildTransactionOwnershipFilter(userId);
 
 	if (query.type) {
 		filters.type = query.type;
@@ -117,7 +129,7 @@ const getTransactionSummary = async (req, res) => {
 	const summary = await Transaction.aggregate([
 		{
 			$match: {
-				user: req.user._id
+				$or: [{ user: req.user._id }, { userId: req.user._id }]
 			}
 		},
 		{
@@ -152,10 +164,10 @@ const getTransactionById = async (req, res) => {
 
 	await migrateLegacyTransactionFields(req.user._id);
 
-	const transaction = await Transaction.findOne({ _id: id, user: req.user._id }).populate(
-		'budget',
-		'name category amount'
-	);
+	const transaction = await Transaction.findOne({
+		_id: id,
+		...buildTransactionOwnershipFilter(req.user._id)
+	}).populate('budget', 'name category amount');
 
 	if (!transaction) {
 		return res.status(404).json({ message: 'Transaction not found' });
@@ -203,6 +215,7 @@ const createTransaction = async (req, res) => {
 
 	const transaction = await Transaction.create({
 		user: req.user._id,
+		userId: req.user._id,
 		budget: budgetId,
 		type,
 		category: normalizedCategory,
@@ -224,7 +237,10 @@ const updateTransaction = async (req, res) => {
 
 	await migrateLegacyTransactionFields(req.user._id);
 
-	const transaction = await Transaction.findOne({ _id: id, user: req.user._id });
+	const transaction = await Transaction.findOne({
+		_id: id,
+		...buildTransactionOwnershipFilter(req.user._id)
+	});
 
 	if (!transaction) {
 		return res.status(404).json({ message: 'Transaction not found' });
@@ -248,7 +264,10 @@ const updateTransaction = async (req, res) => {
 				return res.status(400).json({ message: 'Invalid budget id' });
 			}
 
-			const existingBudget = await Budget.findOne({ _id: nextBudget, user: req.user._id });
+			const existingBudget = await Budget.findOne({
+				_id: nextBudget,
+				...buildTransactionOwnershipFilter(req.user._id)
+			});
 
 			if (!existingBudget) {
 				return res.status(404).json({ message: 'Budget not found' });
@@ -294,7 +313,10 @@ const deleteTransaction = async (req, res) => {
 
 	await migrateLegacyTransactionFields(req.user._id);
 
-	const transaction = await Transaction.findOne({ _id: id, user: req.user._id });
+	const transaction = await Transaction.findOne({
+		_id: id,
+		...buildTransactionOwnershipFilter(req.user._id)
+	});
 
 	if (!transaction) {
 		return res.status(404).json({ message: 'Transaction not found' });

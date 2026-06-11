@@ -8,6 +8,11 @@ const TransactionSchema = new mongoose.Schema(
 			required: true,
 			index: true
 		},
+		userId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'User',
+			index: true
+		},
 		budget: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: 'Budget'
@@ -41,5 +46,15 @@ const TransactionSchema = new mongoose.Schema(
 		timestamps: true
 	}
 );
+
+TransactionSchema.pre('validate', function syncLegacyUserFields() {
+	if (this.user && !this.userId) {
+		this.userId = this.user;
+	}
+
+	if (!this.user && this.userId) {
+		this.user = this.userId;
+	}
+});
 
 export default mongoose.model('Transaction', TransactionSchema);
