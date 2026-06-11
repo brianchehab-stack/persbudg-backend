@@ -126,18 +126,41 @@ const listTransactions = async (req, res) => {
 const getTransactionSummary = async (req, res) => {
 	await migrateLegacyTransactionFields(req.user._id);
 
-	const summary = await Transaction.aggregate([
-		{
-			$match: {
-				$or: [{ user: req.user._id }, { userId: req.user._id }]
+	const ownershipMatch = {
+		$or: [{ user: req.user._id }, { userId: req.user._id }]
+	};
+
+	const [summary, categoryBreakdown] = await Promise.all([
+		Transaction.aggregate([
+			{
+				$match: ownershipMatch
+			},
+			{
+				$group: {
+					_id: '$type',
+					total: { $sum: '$amount' }
+				}
 			}
-		},
-		{
-			$group: {
-				_id: '$type',
-				total: { $sum: '$amount' }
+		]),
+		Transaction.aggregate([
+			{
+				$match: ownershipMatch
+			},
+			{
+				$group: {
+					_id: {
+						type: '$type',
+						category: '$category'
+					},
+					total: { $sum: '$amount' }
+				}
+			},
+			{
+				$sort: {
+					total: -1
+				}
 			}
-		}
+		])
 	]);
 
 	const totals = {
@@ -149,9 +172,31 @@ const getTransactionSummary = async (req, res) => {
 		totals[item._id] = item.total;
 	}
 
+	const pieData = {
+		incomeByCategory: [],
+		expenseByCategory: []
+	};
+
+	for (const item of categoryBreakdown) {
+		const type = item._id?.type;
+		const category = item._id?.category || 'Uncategorized';
+		const typeTotal = totals[type] || 0;
+
+		if (!['income', 'expense'].includes(type)) {
+			continue;
+		}
+
+		pieData[`${type}ByCategory`].push({
+			category,
+			total: item.total,
+			percentage: typeTotal > 0 ? Number(((item.total / typeTotal) * 100).toFixed(2)) : 0
+		});
+	}
+
 	return res.json({
 		...totals,
-		balance: totals.income - totals.expense
+		balance: totals.income - totals.expense,
+		...pieData
 	});
 };
 

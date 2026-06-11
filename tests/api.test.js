@@ -265,6 +265,10 @@ test('transaction CRUD and summary flow works for an authenticated user', async 
   assert.equal(summaryResponse.status, 200);
   assert.equal(summaryResponse.body.expense, 45.5);
   assert.equal(summaryResponse.body.income, 0);
+  assert.ok(Array.isArray(summaryResponse.body.expenseByCategory));
+  assert.ok(Array.isArray(summaryResponse.body.incomeByCategory));
+  assert.equal(summaryResponse.body.expenseByCategory[0].category, 'Fuel');
+  assert.equal(summaryResponse.body.expenseByCategory[0].total, 45.5);
 
   const updateResponse = await request(`/api/transactions/${transactionId}`, {
     method: 'PUT',
