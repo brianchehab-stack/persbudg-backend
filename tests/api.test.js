@@ -212,6 +212,26 @@ test('budget CRUD flow works for an authenticated user', async () => {
   assert.match(deleteResponse.body.message, /deleted/i);
 });
 
+test('budget creation accepts budgetName alias for name', async () => {
+  const authPayload = await registerAndLogin();
+
+  const createResponse = await request('/api/budgets', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authPayload.accessToken}`
+    },
+    body: JSON.stringify({
+      budgetName: 'Rent',
+      category: 'Housing',
+      amount: 1200,
+      period: 'monthly'
+    })
+  });
+
+  assert.equal(createResponse.status, 201);
+  assert.equal(createResponse.body.name, 'Rent');
+});
+
 test('transaction CRUD and summary flow works for an authenticated user', async () => {
   const authPayload = await registerAndLogin();
 

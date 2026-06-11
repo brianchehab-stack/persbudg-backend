@@ -112,6 +112,19 @@ const validateLogin = (req, res, next) => {
 };
 
 const validateBudgetPayload = (req, res, next) => {
+  const resolvedName =
+    req.body.name ?? req.body.budgetName ?? req.body.title ?? req.body.label;
+  const resolvedAmount =
+    req.body.amount ?? req.body.budgetAmount ?? req.body.value;
+
+  if (resolvedName !== undefined) {
+    req.body.name = resolvedName;
+  }
+
+  if (resolvedAmount !== undefined) {
+    req.body.amount = resolvedAmount;
+  }
+
   const { name, amount, period, startDate, endDate } = req.body;
   const isCreate = req.method === 'POST';
   const normalizedPeriod =
